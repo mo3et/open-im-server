@@ -16,6 +16,7 @@ package convert
 
 import (
 	"context"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 
 	"github.com/openimsdk/protocol/sdkws"
@@ -28,7 +29,7 @@ func BlackDB2Pb(ctx context.Context, blackDBs []*model.Black, f func(ctx context
 	}
 	var userIDs []string
 	for _, blackDB := range blackDBs {
-		userIDs = append(userIDs, blackDB.BlockUserID)
+		userIDs = append(userIDs, blackDB.BlackUserID)
 	}
 	userInfos, err := f(ctx, userIDs)
 	if err != nil {
@@ -42,10 +43,10 @@ func BlackDB2Pb(ctx context.Context, blackDBs []*model.Black, f func(ctx context
 			Ex:             blackDB.Ex,
 			OperatorUserID: blackDB.OperatorUserID,
 			BlackUserInfo: &sdkws.PublicUserInfo{
-				UserID:   userInfos[blackDB.BlockUserID].UserID,
-				Nickname: userInfos[blackDB.BlockUserID].Nickname,
-				FaceURL:  userInfos[blackDB.BlockUserID].FaceURL,
-				Ex:       userInfos[blackDB.BlockUserID].Ex,
+				UserID:   userInfos[blackDB.BlackUserID].UserID,
+				Nickname: userInfos[blackDB.BlackUserID].Nickname,
+				FaceURL:  userInfos[blackDB.BlackUserID].FaceURL,
+				Ex:       userInfos[blackDB.BlackUserID].Ex,
 			},
 		}
 		blackPbs = append(blackPbs, blackPb)

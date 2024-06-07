@@ -16,33 +16,42 @@ package controller
 
 import (
 	"context"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/cache"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 	"github.com/openimsdk/tools/db/pagination"
+	"github.com/openimsdk/tools/errs"
 	"github.com/openimsdk/tools/log"
 	"github.com/openimsdk/tools/utils/datautil"
 )
 
 type BlackDatabase interface {
-	// Create add BlackList
+	// Create is add BlackList
 	Create(ctx context.Context, blacks []*model.Black) (err error)
-	// Delete delete BlackList
+	// Delete is delete BlackList
 	Delete(ctx context.Context, blacks []*model.Black) (err error)
-	// FindOwnerBlacks get BlackList list
+	// FindOwnerBlacks is get BlackList list
 	FindOwnerBlacks(ctx context.Context, ownerUserID string, pagination pagination.Pagination) (total int64, blacks []*model.Black, err error)
 	FindBlackInfos(ctx context.Context, ownerUserID string, userIDs []string) (blacks []*model.Black, err error)
-	// CheckIn Check whether user2 is in the black list of user1 (inUser1Blacks==true) Check whether user1 is in the black list of user2 (inUser2Blacks==true)
+	// CheckIn is Check whether user2 is in the black list of user1 (inUser1Blacks==true) Check whether user1 is in the black list of user2 (inUser2Blacks==true)
 	CheckIn(ctx context.Context, userID1, userID2 string) (inUser1Blacks bool, inUser2Blacks bool, err error)
+	// FindBlacksWithError is fetches specified blacks of a user and returns an error if any do not exist
+	FindBlacksWithError(ctx context.Context, ownerUserID string, BlackUserIDs []string) (Blacks []*model.Black, err error)
+	// FindBlackIncrVerion is find blacklist is increment versions in DB.
+	FindBlackIncrVersion(ctx context.Context, ownerUserID string, version uint, limit int) (*model.VersionLog, error)
+	// FindMaxBlackVersionCache is find blacklist max version in cache.
+	FindMaxBlackVersionCache(ctx context.Context, ownerUserID string) (*model.VersionLog, error)
 }
 
 type blackDatabase struct {
-	black database.Black
-	cache cache.BlackCache
+	black           database.Black
+	cache           cache.BlackCache
+	ownerVersionLog database.VersionLog
 }
 
 func NewBlackDatabase(black database.Black, cache cache.BlackCache) BlackDatabase {
-	return &blackDatabase{black, cache}
+	return &blackDatabase{black: black, cache: cache}
 }
 
 // Create Add Blacklist.
@@ -94,7 +103,27 @@ func (b *blackDatabase) FindBlackIDs(ctx context.Context, ownerUserID string) (b
 	return b.cache.GetBlackIDs(ctx, ownerUserID)
 }
 
-// FindBlackInfos Get Blacklist List.
+// FindBlackInfos Get Blacklist List user infos.
 func (b *blackDatabase) FindBlackInfos(ctx context.Context, ownerUserID string, userIDs []string) (blacks []*model.Black, err error) {
 	return b.black.FindOwnerBlackInfos(ctx, ownerUserID, userIDs)
+}
+
+// FindBlacksWithError fetches specified blacks of a user and returns an error if any do not exist
+func (b *blackDatabase) FindBlacksWithError(ctx context.Context, ownerUserID string, blackUserIDs []string) (blacks []*model.Black, err error) {
+	blacks, err = b.black.FindOwnerBlackInfos(ctx, ownerUserID, blackUserIDs)
+	if err != nil {
+		return
+	}
+	if len(blacks) != len(blackUserIDs) {
+		err = errs.ErrRecordNotFound.Wrap()
+	}
+	return
+}
+
+func (b *blackDatabase) FindBlackIncrVersion(ctx context.Context, ownerUserID string, version uint, limit int) (*model.VersionLog, error) {
+	return b.ownerVersionLog.FindChangeLog(ctx, ownerUserID, version, limit)
+}
+
+func (b *blackDatabase) FindMaxBlackVersionCache(ctx context.Context, ownerUserID string) (*model.VersionLog, error) {
+	return b.cache.FindMaxBlackVersion(ctx, ownerUserID)
 }

@@ -19,8 +19,10 @@ import (
 )
 
 type Black struct {
-	OwnerUserID    string    `bson:"owner_user_id"`
-	BlockUserID    string    `bson:"block_user_id"`
+	OwnerUserID string `bson:"owner_user_id"`
+	BlackUserID string `bson:"black_user_id"`
+	BlackNickname  string    `bson:"black_nickname"`
+	BlackFaceURL   string    `bson:"black_face_url"`
 	CreateTime     time.Time `bson:"create_time"`
 	AddSource      int32     `bson:"add_source"`
 	OperatorUserID string    `bson:"operator_user_id"`

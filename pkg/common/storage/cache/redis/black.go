@@ -16,14 +16,16 @@ package redis
 
 import (
 	"context"
+	"time"
+
 	"github.com/dtm-labs/rockscache"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/config"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/cache"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/cache/cachekey"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database"
+	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 	"github.com/openimsdk/tools/log"
 	"github.com/redis/go-redis/v9"
-	"time"
 )
 
 const (
@@ -32,9 +34,10 @@ const (
 
 type BlackCacheRedis struct {
 	cache.BatchDeleter
+	blackDB    database.Black
 	expireTime time.Duration
 	rcClient   *rockscache.Client
-	blackDB    database.Black
+	syncCount  int
 }
 
 func NewBlackCacheRedis(rdb redis.UniversalClient, localCache *config.LocalCache, blackDB database.Black, options *rockscache.Options) cache.BlackCache {
@@ -42,10 +45,10 @@ func NewBlackCacheRedis(rdb redis.UniversalClient, localCache *config.LocalCache
 	b := localCache.Friend
 	log.ZDebug(context.Background(), "black local cache init", "Topic", b.Topic, "SlotNum", b.SlotNum, "SlotSize", b.SlotSize, "enable", b.Enable())
 	return &BlackCacheRedis{
-		BatchDeleter: batchHandler,
-		expireTime:   blackExpireTime,
-		rcClient:     rockscache.NewClient(rdb, *options),
 		blackDB:      blackDB,
+		rcClient:     rockscache.NewClient(rdb, *options),
+		expireTime:   blackExpireTime,
+		BatchDeleter: batchHandler,
 	}
 }
 
@@ -60,6 +63,10 @@ func (b *BlackCacheRedis) CloneBlackCache() cache.BlackCache {
 
 func (b *BlackCacheRedis) getBlackIDsKey(ownerUserID string) string {
 	return cachekey.GetBlackIDsKey(ownerUserID)
+}
+
+func (b *BlackCacheRedis) getBlackMaxVersionKey(ownerUserID string) string {
+	return cachekey.GetBlackMaxVersionKey(ownerUserID)
 }
 
 func (b *BlackCacheRedis) GetBlackIDs(ctx context.Context, userID string) (blackIDs []string, err error) {
@@ -79,4 +86,19 @@ func (b *BlackCacheRedis) DelBlackIDs(_ context.Context, userID string) cache.Bl
 	cache.AddKeys(b.getBlackIDsKey(userID))
 
 	return cache
+}
+
+func (b *BlackCacheRedis) DelMaxBlackVersion(ownerUserIDs ...string) cache.BlackCache {
+	newBlackCache := b.CloneBlackCache()
+	for _, ownerUserID := range ownerUserIDs {
+		key := b.getBlackMaxVersionKey(ownerUserID)
+		newBlackCache.AddKeys(key) // Assuming AddKeys marks the keys for deletion
+	}
+	return newBlackCache
+}
+
+func (b *BlackCacheRedis) FindMaxBlackVersion(ctx context.Context, ownerUserID string) (*model.VersionLog, error) {
+	return getCache(ctx, b.rcClient, b.getBlackMaxVersionKey(ownerUserID), b.expireTime, func(ctx context.Context) (*model.VersionLog, error) {
+		return b.blackDB.FindBlackIncrVersion(ctx, ownerUserID, 0, 0)
+	})
 }

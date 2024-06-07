@@ -24,3 +24,20 @@ func friendDB2PB(db *model.Friend) *relation.FriendInfo {
 func friendsDB2PB(db []*model.Friend) []*relation.FriendInfo {
 	return datautil.Slice(db, friendDB2PB)
 }
+
+func blackDB2PB(db *model.Black) *relation.BlackInfo {
+	return &relation.BlackInfo{
+		OwnerUserID:    db.OwnerUserID,
+		BlackUserID:    db.BlackUserID,
+		BlackNickname:  db.BlackNickname,
+		BlackFaceURL:   db.BlackFaceURL,
+		CreateTime:     db.CreateTime.UnixMilli(),
+		AddSource:      db.AddSource,
+		OperatorUserID: db.OperatorUserID,
+		Ex:             db.Ex,
+	}
+}
+
+func blacksDB2PB(db []*model.Black) []*relation.BlackInfo {
+	return datautil.Slice(db, blackDB2PB)
+}
