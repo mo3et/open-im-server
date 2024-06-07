@@ -16,6 +16,7 @@ package mgo
 
 import (
 	"context"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 
@@ -53,7 +54,7 @@ func NewFriendMongo(db *mongo.Database) (database.Friend, error) {
 }
 
 func (f *FriendMgo) friendSort() any {
-	return bson.D{{"is_pinned", -1}, {"friend_nickname", 1}, {"create_time", 1}}
+	return bson.D{{Key: "is_pinned", Value: -1}, {Key: "friend_nickname", Value: 1}, {Key: "create_time", Value: 1}}
 }
 
 // Create inserts multiple friend records.

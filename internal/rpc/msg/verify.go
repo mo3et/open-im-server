@@ -16,13 +16,14 @@ package msg
 
 import (
 	"context"
+	"math/rand"
+	"strconv"
+	"time"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/common/servererrs"
 	"github.com/openimsdk/tools/utils/datautil"
 	"github.com/openimsdk/tools/utils/encrypt"
 	"github.com/openimsdk/tools/utils/timeutil"
-	"math/rand"
-	"strconv"
-	"time"
 
 	"github.com/openimsdk/protocol/constant"
 	"github.com/openimsdk/protocol/msg"
@@ -64,7 +65,7 @@ func (m *msgServer) messageVerification(ctx context.Context, data *msg.SendMsgRe
 			return err
 		}
 		if black {
-			return servererrs.ErrBlockedByPeer.Wrap()
+			return servererrs.ErrBlackedByPeer.Wrap()
 		}
 		if m.config.RpcConfig.FriendVerify {
 			friend, err := m.FriendLocalCache.IsFriend(ctx, data.MsgData.SendID, data.MsgData.RecvID)

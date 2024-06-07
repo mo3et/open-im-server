@@ -50,7 +50,7 @@ var (
 	ErrMessageHasReadDisable = errs.NewCodeError(MessageHasReadDisable, "MessageHasReadDisable")
 
 	ErrCanNotAddYourself   = errs.NewCodeError(CanNotAddYourselfError, "CanNotAddYourselfError")
-	ErrBlockedByPeer       = errs.NewCodeError(BlockedByPeer, "BlockedByPeer")
+	ErrBlackedByPeer       = errs.NewCodeError(BlackedByPeer, "BlackedByPeer")
 	ErrNotPeersFriend      = errs.NewCodeError(NotPeersFriend, "NotPeersFriend")
 	ErrRelationshipAlready = errs.NewCodeError(RelationshipAlreadyError, "RelationshipAlreadyError")
 

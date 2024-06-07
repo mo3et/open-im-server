@@ -394,7 +394,7 @@ func (s *friendServer) GetSpecifiedFriendsInfo(ctx context.Context, req *relatio
 		return e.FriendUserID
 	})
 	blackMap := datautil.SliceToMap(blacks, func(e *model.Black) string {
-		return e.BlockUserID
+		return e.BlackUserID
 	})
 	resp := &relation.GetSpecifiedFriendsInfoResp{
 		Infos: make([]*relation.GetSpecifiedFriendsInfoInfo, 0, len(req.UserIDList)),
@@ -478,11 +478,6 @@ func (s *friendServer) GetIncrementalFriendsApplyTo(ctx context.Context, req *re
 }
 
 func (s *friendServer) GetIncrementalFriendsApplyFrom(ctx context.Context, req *relation.GetIncrementalFriendsApplyFromReq) (*relation.GetIncrementalFriendsApplyFromResp, error) {
-	// TODO implement me
-	return nil, nil
-}
-
-func (s *friendServer) GetIncrementalBlacks(ctx context.Context, req *relation.GetIncrementalBlacksReq) (*relation.GetIncrementalBlacksResp, error) {
 	// TODO implement me
 	return nil, nil
 }

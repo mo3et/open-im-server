@@ -65,7 +65,7 @@ const (
 
 	// Relationship error codes.
 	CanNotAddYourselfError   = 1301 // Cannot add yourself as a friend
-	BlockedByPeer            = 1302 // Blocked by the peer
+	BlackedByPeer            = 1302 // Blacked by the peer
 	NotPeersFriend           = 1303 // Not the peer's friend
 	RelationshipAlreadyError = 1304 // Already in a friend relationship
 

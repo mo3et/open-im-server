@@ -16,6 +16,7 @@ package mgo
 
 import (
 	"context"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 
@@ -50,8 +51,8 @@ type UserMongoDriver struct {
 func (u *UserMongoDriver) AddSubscriptionList(ctx context.Context, userID string, userIDList []string) error {
 	// Check the number of lists in the key.
 	pipeline := mongo.Pipeline{
-		{{"$match", bson.D{{"user_id", SubscriptionPrefix + userID}}}},
-		{{"$project", bson.D{{"count", bson.D{{"$size", "$user_id_list"}}}}}},
+		{{Key: "$match", Value: bson.D{{Key: "user_id", Value: SubscriptionPrefix + userID}}}},
+		{{Key: "$project", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$size", Value: "$user_id_list"}}}}}},
 	}
 	// perform aggregate operations
 	cursor, err := u.userCollection.Aggregate(ctx, pipeline)

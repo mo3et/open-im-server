@@ -18,6 +18,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/openimsdk/open-im-server/v3/internal/rpc/incrversion"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 
 	"github.com/openimsdk/open-im-server/v3/pkg/authverify"
@@ -59,7 +60,7 @@ func (s *friendServer) RemoveBlack(ctx context.Context, req *relation.RemoveBlac
 		return nil, err
 	}
 
-	if err := s.blackDatabase.Delete(ctx, []*model.Black{{OwnerUserID: req.OwnerUserID, BlockUserID: req.BlackUserID}}); err != nil {
+	if err := s.blackDatabase.Delete(ctx, []*model.Black{{OwnerUserID: req.OwnerUserID, BlackUserID: req.BlackUserID}}); err != nil {
 		return nil, err
 	}
 
@@ -78,7 +79,7 @@ func (s *friendServer) AddBlack(ctx context.Context, req *relation.AddBlackReq) 
 	}
 	black := model.Black{
 		OwnerUserID:    req.OwnerUserID,
-		BlockUserID:    req.BlackUserID,
+		BlackUserID:    req.BlackUserID,
 		OperatorUserID: mcontext.GetOpUserID(ctx),
 		CreateTime:     time.Now(),
 		Ex:             req.Ex,
@@ -89,4 +90,41 @@ func (s *friendServer) AddBlack(ctx context.Context, req *relation.AddBlackReq) 
 	}
 	s.notificationSender.BlackAddedNotification(ctx, req)
 	return &relation.AddBlackResp{}, nil
+}
+
+func (s *friendServer) GetIncrementalBlacks(ctx context.Context, req *relation.GetIncrementalBlacksReq) (*relation.GetIncrementalBlacksResp, error) {
+	if err := authverify.CheckAccessV3(ctx, req.UserID, s.config.Share.IMAdminUserID); err != nil {
+		return nil, err
+	}
+
+	opt := incrversion.Option[*relation.BlackInfo, relation.GetIncrementalBlacksResp]{
+		Ctx:             ctx,
+		VersionKey:      req.UserID,
+		VersionID:       req.VersionID,
+		VersionNumber:   req.Version,
+		SyncLimit:       s.config.RpcConfig.FriendSyncCount,
+		Version:         s.friendDatabase.FindFriendIncrVersion,
+		CacheMaxVersion: s.friendDatabase.FindMaxFriendVersionCache,
+		SortID:          s.friendDatabase.FindSortFriendUserIDs,
+		Find: func(ctx context.Context, ids []string) ([]*relation.BlackInfo, error) {
+			blacks, err := s.blackDatabase.FindBlacksWithError(ctx, req.UserID, ids)
+			if err != nil {
+				return nil, err
+			}
+			return blacksDB2PB(blacks), nil
+		},
+		ID: func(elem *relation.BlackInfo) string { return elem.BlackUserID },
+		Resp: func(version *model.VersionLog, delIDs []string, list []*relation.BlackInfo, full bool) *relation.GetIncrementalBlacksResp {
+			return &relation.GetIncrementalBlacksResp{
+				VersionID:     version.ID.Hex(),
+				Version:       uint64(version.Version),
+				Full:          full,
+				SyncCount:     uint32(s.config.RpcConfig.FriendSyncCount),
+				DeleteUserIds: delIDs,
+				Changes:       list,
+			}
+		},
+	}
+
+	return opt.Build()
 }

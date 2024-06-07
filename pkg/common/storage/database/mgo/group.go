@@ -16,9 +16,10 @@ package mgo
 
 import (
 	"context"
+	"time"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
-	"time"
 
 	"github.com/openimsdk/protocol/constant"
 	"github.com/openimsdk/tools/db/mongoutil"
@@ -48,7 +49,7 @@ type GroupMgo struct {
 }
 
 func (g *GroupMgo) sortGroup() any {
-	return bson.D{{"group_name", 1}, {"create_time", 1}}
+	return bson.D{{Key: "group_name", Value: 1}, {Key: "create_time", Value: 1}}
 }
 
 func (g *GroupMgo) Create(ctx context.Context, groups []*model.Group) (err error) {
