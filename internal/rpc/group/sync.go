@@ -9,21 +9,14 @@ import (
 	"github.com/openimsdk/protocol/sdkws"
 )
 
-func (s *groupServer) SearchGroupMember(ctx context.Context, req *pbgroup.SearchGroupMemberReq) (*pbgroup.SearchGroupMemberResp, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (s *groupServer) GetIncrementalGroupMember(ctx context.Context, req *pbgroup.GetIncrementalGroupMemberReq) (*pbgroup.GetIncrementalGroupMemberResp, error) {
 	opt := incrversion.Option[*sdkws.GroupMemberFullInfo, pbgroup.GetIncrementalGroupMemberResp]{
 		Ctx:             ctx,
 		VersionKey:      req.GroupID,
 		VersionID:       req.VersionID,
 		VersionNumber:   req.Version,
-		SyncLimit:       s.config.RpcConfig.GroupSyncCount,
 		Version:         s.db.FindMemberIncrVersion,
 		CacheMaxVersion: s.db.FindMaxGroupMemberVersionCache,
-		SortID:          s.db.FindSortGroupMemberUserIDs,
 		Find: func(ctx context.Context, ids []string) ([]*sdkws.GroupMemberFullInfo, error) {
 			return s.getGroupMembersInfo(ctx, req.GroupID, ids)
 		},
@@ -51,10 +44,8 @@ func (s *groupServer) GetIncrementalJoinGroup(ctx context.Context, req *pbgroup.
 		VersionKey:      req.UserID,
 		VersionID:       req.VersionID,
 		VersionNumber:   req.Version,
-		SyncLimit:       s.config.RpcConfig.GroupSyncCount,
 		Version:         s.db.FindJoinIncrVersion,
 		CacheMaxVersion: s.db.FindMaxJoinGroupVersionCache,
-		SortID:          s.db.FindSortJoinGroupIDs,
 		Find:            s.getGroupsInfo,
 		ID:              func(elem *sdkws.GroupInfo) string { return elem.GroupID },
 		Resp: func(version *model.VersionLog, delIDs []string, list []*sdkws.GroupInfo, full bool) *pbgroup.GetIncrementalJoinGroupResp {

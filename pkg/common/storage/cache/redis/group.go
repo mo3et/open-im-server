@@ -27,7 +27,6 @@ import (
 	"github.com/openimsdk/protocol/constant"
 	"github.com/openimsdk/tools/errs"
 	"github.com/openimsdk/tools/log"
-	"github.com/openimsdk/tools/utils/datautil"
 	"github.com/redis/go-redis/v9"
 	"time"
 )
@@ -296,26 +295,6 @@ func (g *GroupCacheRedis) GetGroupMembersInfo(ctx context.Context, groupID strin
 	})
 }
 
-func (g *GroupCacheRedis) GetGroupMembersPage(
-	ctx context.Context,
-	groupID string,
-	userIDs []string,
-	showNumber, pageNumber int32,
-) (total uint32, groupMembers []*model.GroupMember, err error) {
-	groupMemberIDs, err := g.GetGroupMemberIDs(ctx, groupID)
-	if err != nil {
-		return 0, nil, err
-	}
-	if userIDs != nil {
-		userIDs = datautil.BothExist(userIDs, groupMemberIDs)
-	} else {
-		userIDs = groupMemberIDs
-	}
-	groupMembers, err = g.GetGroupMembersInfo(ctx, groupID, datautil.Paginate(userIDs, int(showNumber), int(showNumber)))
-
-	return uint32(len(userIDs)), groupMembers, err
-}
-
 func (g *GroupCacheRedis) GetAllGroupMembersInfo(ctx context.Context, groupID string) (groupMembers []*model.GroupMember, err error) {
 	groupMemberIDs, err := g.GetGroupMemberIDs(ctx, groupID)
 	if err != nil {
@@ -426,27 +405,27 @@ func (g *GroupCacheRedis) FindGroupMemberUser(ctx context.Context, groupIDs []st
 	})
 }
 
-func (g *GroupCacheRedis) FindSortGroupMemberUserIDs(ctx context.Context, groupID string) ([]string, error) {
-	userIDs, err := g.GetGroupMemberIDs(ctx, groupID)
-	if err != nil {
-		return nil, err
-	}
-	if len(userIDs) > g.syncCount {
-		userIDs = userIDs[:g.syncCount]
-	}
-	return userIDs, nil
-}
-
-func (g *GroupCacheRedis) FindSortJoinGroupIDs(ctx context.Context, userID string) ([]string, error) {
-	groupIDs, err := g.GetJoinedGroupIDs(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if len(groupIDs) > g.syncCount {
-		groupIDs = groupIDs[:g.syncCount]
-	}
-	return groupIDs, nil
-}
+//func (g *GroupCacheRedis) FindSortGroupMemberUserIDs(ctx context.Context, groupID string) ([]string, error) {
+//	userIDs, err := g.GetGroupMemberIDs(ctx, groupID)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if len(userIDs) > g.syncCount {
+//		userIDs = userIDs[:g.syncCount]
+//	}
+//	return userIDs, nil
+//}
+//
+//func (g *GroupCacheRedis) FindSortJoinGroupIDs(ctx context.Context, userID string) ([]string, error) {
+//	groupIDs, err := g.GetJoinedGroupIDs(ctx, userID)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if len(groupIDs) > g.syncCount {
+//		groupIDs = groupIDs[:g.syncCount]
+//	}
+//	return groupIDs, nil
+//}
 
 func (g *GroupCacheRedis) DelMaxGroupMemberVersion(groupIDs ...string) cache.GroupCache {
 	keys := make([]string, 0, len(groupIDs))

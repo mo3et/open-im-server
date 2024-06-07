@@ -46,7 +46,6 @@ type GroupCache interface {
 	GetGroupMemberInfo(ctx context.Context, groupID, userID string) (groupMember *model.GroupMember, err error)
 	GetGroupMembersInfo(ctx context.Context, groupID string, userID []string) (groupMembers []*model.GroupMember, err error)
 	GetAllGroupMembersInfo(ctx context.Context, groupID string) (groupMembers []*model.GroupMember, err error)
-	GetGroupMembersPage(ctx context.Context, groupID string, userID []string, showNumber, pageNumber int32) (total uint32, groupMembers []*model.GroupMember, err error)
 	FindGroupMemberUser(ctx context.Context, groupIDs []string, userID string) ([]*model.GroupMember, error)
 
 	GetGroupRoleLevelMemberIDs(ctx context.Context, groupID string, roleLevel int32) ([]string, error)
@@ -60,8 +59,8 @@ type GroupCache interface {
 	GetGroupMemberNum(ctx context.Context, groupID string) (memberNum int64, err error)
 	DelGroupsMemberNum(groupID ...string) GroupCache
 
-	FindSortGroupMemberUserIDs(ctx context.Context, groupID string) ([]string, error)
-	FindSortJoinGroupIDs(ctx context.Context, userID string) ([]string, error)
+	//FindSortGroupMemberUserIDs(ctx context.Context, groupID string) ([]string, error)
+	//FindSortJoinGroupIDs(ctx context.Context, userID string) ([]string, error)
 
 	DelMaxGroupMemberVersion(groupIDs ...string) GroupCache
 	DelMaxJoinGroupVersion(userIDs ...string) GroupCache

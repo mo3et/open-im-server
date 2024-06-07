@@ -271,14 +271,24 @@ func (s *friendServer) GetDesignatedFriends(ctx context.Context, req *relation.G
 	if datautil.Duplicate(req.FriendUserIDs) {
 		return nil, errs.ErrArgs.WrapMsg("friend userID repeated")
 	}
-	friends, err := s.friendDatabase.FindFriendsWithError(ctx, req.OwnerUserID, req.FriendUserIDs)
+	friends, err := s.getFriend(ctx, req.OwnerUserID, req.FriendUserIDs)
 	if err != nil {
 		return nil, err
 	}
-	if resp.FriendsInfo, err = convert.FriendsDB2Pb(ctx, friends, s.userRpcClient.GetUsersInfoMap); err != nil {
+	return &relation.GetDesignatedFriendsResp{
+		FriendsInfo: friends,
+	}, nil
+}
+
+func (s *friendServer) getFriend(ctx context.Context, ownerUserID string, friendUserIDs []string) ([]*sdkws.FriendInfo, error) {
+	if len(friendUserIDs) == 0 {
+		return nil, nil
+	}
+	friends, err := s.friendDatabase.FindFriendsWithError(ctx, ownerUserID, friendUserIDs)
+	if err != nil {
 		return nil, err
 	}
-	return resp, nil
+	return convert.FriendsDB2Pb(ctx, friends, s.userRpcClient.GetUsersInfoMap)
 }
 
 // Get the list of friend requests sent out proactively.
