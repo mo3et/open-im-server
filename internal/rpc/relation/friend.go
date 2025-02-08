@@ -16,6 +16,7 @@ package relation
 
 import (
 	"context"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/rpcli"
 
 	"github.com/openimsdk/tools/mq/memamq"
@@ -114,7 +115,7 @@ func Start(ctx context.Context, config *Config, client discovery.SvcDiscoveryReg
 		db: controller.NewFriendDatabase(
 			friendMongoDB,
 			friendRequestMongoDB,
-			redis.NewFriendCacheRedis(rdb, &config.LocalCacheConfig, friendMongoDB, redis.GetRocksCacheOptions()),
+			redis.NewFriendCacheRedis(rdb, &config.LocalCacheConfig, friendMongoDB, friendRequestMongoDB, redis.GetRocksCacheOptions()),
 			mgocli.GetTx(),
 		),
 		blackDatabase: controller.NewBlackDatabase(
@@ -131,7 +132,6 @@ func Start(ctx context.Context, config *Config, client discovery.SvcDiscoveryReg
 	return nil
 }
 
-// ok.
 func (s *friendServer) ApplyToAddFriend(ctx context.Context, req *relation.ApplyToAddFriendReq) (resp *relation.ApplyToAddFriendResp, err error) {
 	resp = &relation.ApplyToAddFriendResp{}
 	if err := authverify.CheckAccessV3(ctx, req.FromUserID, s.config.Share.IMAdminUserID); err != nil {

@@ -16,11 +16,13 @@ package mgo
 
 import (
 	"context"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 
 	"github.com/openimsdk/tools/db/mongoutil"
 	"github.com/openimsdk/tools/db/pagination"
+	"github.com/openimsdk/tools/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -38,11 +40,18 @@ func NewFriendRequestMongo(db *mongo.Database) (database.FriendRequest, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FriendRequestMgo{coll: coll}, nil
+
+	user, err := NewVersionLog(db.Collection(database.FriendRequestVersionName))
+	if err != nil {
+		return nil, err
+	}
+
+	return &FriendRequestMgo{coll: coll, user: user}, nil
 }
 
 type FriendRequestMgo struct {
 	coll *mongo.Collection
+	user database.VersionLog
 }
 
 func (f *FriendRequestMgo) FindToUserID(ctx context.Context, toUserID string, pagination pagination.Pagination) (total int64, friendRequests []*model.FriendRequest, err error) {
@@ -62,18 +71,54 @@ func (f *FriendRequestMgo) FindBothFriendRequests(ctx context.Context, fromUserI
 }
 
 func (f *FriendRequestMgo) Create(ctx context.Context, friendRequests []*model.FriendRequest) error {
-	return mongoutil.InsertMany(ctx, f.coll, friendRequests)
+	return mongoutil.IncrVersion(func() error {
+		return mongoutil.InsertMany(ctx, f.coll, friendRequests)
+	}, func() error {
+		frs := make(map[string][]string)
+		for _, friendRequest := range friendRequests {
+			frs[friendRequest.FromUserID] = append(frs[friendRequest.FromUserID], friendRequest.ToUserID)
+		}
+		for fromUserID, toUserID := range frs {
+			if err := f.user.IncrVersion(ctx, fromUserID, toUserID, model.VersionStateInsert); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, func() error {
+		frs := make(map[string][]string)
+		for _, friendRequest := range friendRequests {
+			frs[friendRequest.ToUserID] = append(frs[friendRequest.ToUserID], friendRequest.FromUserID)
+		}
+		for toUserID, fromUserIDs := range frs {
+			if err := f.user.IncrVersion(ctx, toUserID, fromUserIDs, model.VersionStateInsert); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (f *FriendRequestMgo) Delete(ctx context.Context, fromUserID, toUserID string) (err error) {
-	return mongoutil.DeleteOne(ctx, f.coll, bson.M{"from_user_id": fromUserID, "to_user_id": toUserID})
+	return mongoutil.IncrVersion(func() error {
+		return mongoutil.DeleteOne(ctx, f.coll, bson.M{"from_user_id": fromUserID, "to_user_id": toUserID})
+	}, func() error {
+		return f.user.IncrVersion(ctx, fromUserID, []string{toUserID}, model.VersionStateDelete)
+	}, func() error {
+		return f.user.IncrVersion(ctx, toUserID, []string{fromUserID}, model.VersionStateDelete)
+	})
 }
 
 func (f *FriendRequestMgo) UpdateByMap(ctx context.Context, formUserID, toUserID string, args map[string]any) (err error) {
 	if len(args) == 0 {
 		return nil
 	}
-	return mongoutil.UpdateOne(ctx, f.coll, bson.M{"from_user_id": formUserID, "to_user_id": toUserID}, bson.M{"$set": args}, true)
+	return mongoutil.IncrVersion(func() error {
+		return mongoutil.UpdateOne(ctx, f.coll, bson.M{"from_user_id": formUserID, "to_user_id": toUserID}, bson.M{"$set": args}, true)
+	}, func() error {
+		return f.user.IncrVersion(ctx, formUserID, []string{toUserID}, model.VersionStateUpdate)
+	}, func() error {
+		return f.user.IncrVersion(ctx, toUserID, []string{formUserID}, model.VersionStateUpdate)
+	})
 }
 
 func (f *FriendRequestMgo) Update(ctx context.Context, friendRequest *model.FriendRequest) (err error) {
@@ -99,8 +144,16 @@ func (f *FriendRequestMgo) Update(ctx context.Context, friendRequest *model.Frie
 	if len(updater) == 0 {
 		return nil
 	}
+
 	filter := bson.M{"from_user_id": friendRequest.FromUserID, "to_user_id": friendRequest.ToUserID}
-	return mongoutil.UpdateOne(ctx, f.coll, filter, bson.M{"$set": updater}, true)
+
+	return mongoutil.IncrVersion(func() error {
+		return mongoutil.UpdateOne(ctx, f.coll, filter, bson.M{"$set": updater}, true)
+	}, func() error {
+		return f.user.IncrVersion(ctx, friendRequest.FromUserID, []string{friendRequest.ToUserID}, model.VersionStateUpdate)
+	}, func() error {
+		return f.user.IncrVersion(ctx, friendRequest.ToUserID, []string{friendRequest.FromUserID}, model.VersionStateUpdate)
+	})
 }
 
 func (f *FriendRequestMgo) Find(ctx context.Context, fromUserID, toUserID string) (friendRequest *model.FriendRequest, err error) {
@@ -109,4 +162,13 @@ func (f *FriendRequestMgo) Find(ctx context.Context, fromUserID, toUserID string
 
 func (f *FriendRequestMgo) Take(ctx context.Context, fromUserID, toUserID string) (friendRequest *model.FriendRequest, err error) {
 	return f.Find(ctx, fromUserID, toUserID)
+}
+
+func (f *FriendRequestMgo) FriendRequestIncrVersion(ctx context.Context, ownerUserID string, userIDs []string, state int32) error {
+	return f.user.IncrVersion(ctx, ownerUserID, userIDs, state)
+}
+
+func (f *FriendRequestMgo) FindFriendRequestIncrVersion(ctx context.Context, ownerUserID string, version uint, limit int) (*model.VersionLog, error) {
+	log.ZDebug(ctx, "find friend request incr version", "ownerUserID", ownerUserID, "version", version)
+	return f.user.FindChangeLog(ctx, ownerUserID, version, limit)
 }

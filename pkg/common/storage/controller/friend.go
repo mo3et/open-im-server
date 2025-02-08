@@ -17,10 +17,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/database/mgo"
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
-	"time"
 
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/cache"
 	"github.com/openimsdk/protocol/constant"
@@ -87,6 +88,12 @@ type FriendDatabase interface {
 	FindFriendUserID(ctx context.Context, friendUserID string) ([]string, error)
 
 	OwnerIncrVersion(ctx context.Context, ownerUserID string, friendUserIDs []string, state int32) error
+
+	FindFriendRequestIncrVersion(ctx context.Context, ownerUserID string, version uint, limit int) (*model.VersionLog, error)
+
+	FindMaxFriendRequestVersionCache(ctx context.Context, ownerUserID string) (*model.VersionLog, error)
+
+	FriendRequestIncrVersion(ctx context.Context, ownerUserID string, userIDs []string, state int32) error
 }
 
 type friendDatabase struct {
@@ -135,15 +142,25 @@ func (f *friendDatabase) AddFriendRequest(ctx context.Context, fromUserID, toUse
 			m["req_msg"] = reqMsg
 			m["ex"] = ex
 			m["create_time"] = time.Now()
-			return f.friendRequest.UpdateByMap(ctx, fromUserID, toUserID, m)
+
+			if err := f.friendRequest.UpdateByMap(ctx, fromUserID, toUserID, m); err != nil {
+				return err
+			}
 		case mgo.IsNotFound(err):
-			return f.friendRequest.Create(
-				ctx,
-				[]*model.FriendRequest{{FromUserID: fromUserID, ToUserID: toUserID, ReqMsg: reqMsg, Ex: ex, CreateTime: time.Now(), HandleTime: time.Unix(0, 0)}},
-			)
+			friendRequest := []*model.FriendRequest{{
+				FromUserID: fromUserID, ToUserID: toUserID,
+				ReqMsg: reqMsg, Ex: ex, CreateTime: time.Now(),
+				HandleTime: time.Unix(0, 0),
+			}}
+
+			if err := f.friendRequest.Create(ctx, friendRequest); err != nil {
+				return err
+			}
 		default:
 			return err
 		}
+
+		return f.cache.DelMaxFriendRequestVersion(fromUserID, toUserID).ChainExecDel(ctx)
 	})
 }
 
@@ -232,7 +249,7 @@ func (f *friendDatabase) RefuseFriendRequest(ctx context.Context, friendRequest 
 		return fmt.Errorf("failed to update friend request from %s to %s as refused: %w", friendRequest.FromUserID, friendRequest.ToUserID, err)
 	}
 
-	return nil
+	return f.cache.DelMaxFriendRequestVersion(friendRequest.FromUserID, friendRequest.ToUserID).ChainExecDel(ctx)
 }
 
 // AgreeFriendRequest accepts a friend request. It first checks for an existing, unprocessed request.
@@ -302,7 +319,7 @@ func (f *friendDatabase) AgreeFriendRequest(ctx context.Context, friendRequest *
 				return err
 			}
 		}
-		return f.cache.DelFriendIDs(friendRequest.ToUserID, friendRequest.FromUserID).DelMaxFriendVersion(friendRequest.ToUserID, friendRequest.FromUserID).ChainExecDel(ctx)
+		return f.cache.DelFriendIDs(friendRequest.ToUserID, friendRequest.FromUserID).DelMaxFriendVersion(friendRequest.ToUserID, friendRequest.FromUserID).DelMaxFriendRequestVersion(friendRequest.FromUserID, friendRequest.ToUserID).ChainExecDel(ctx)
 	})
 }
 
@@ -396,4 +413,22 @@ func (f *friendDatabase) OwnerIncrVersion(ctx context.Context, ownerUserID strin
 		return err
 	}
 	return f.cache.DelMaxFriendVersion(ownerUserID).ChainExecDel(ctx)
+}
+
+// Friend Request Incr Version series
+
+func (f *friendDatabase) FindFriendRequestIncrVersion(ctx context.Context, ownerUserID string, version uint, limit int) (*model.VersionLog, error) {
+	return f.friendRequest.FindFriendRequestIncrVersion(ctx, ownerUserID, version, limit)
+}
+
+func (f *friendDatabase) FindMaxFriendRequestVersionCache(ctx context.Context, ownerUserID string) (*model.VersionLog, error) {
+	return f.cache.FindMaxFriendRequestVersion(ctx, ownerUserID)
+}
+
+func (f *friendDatabase) FriendRequestIncrVersion(ctx context.Context, ownerUserID string, userIDs []string, state int32) error {
+	if err := f.friendRequest.FriendRequestIncrVersion(ctx, ownerUserID, userIDs, state); err != nil {
+		return err
+	}
+
+	return f.cache.DelMaxFriendRequestVersion(ownerUserID).ChainExecDel(ctx)
 }

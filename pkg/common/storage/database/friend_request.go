@@ -16,6 +16,7 @@ package database
 
 import (
 	"context"
+
 	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 	"github.com/openimsdk/tools/db/pagination"
 )
@@ -37,4 +38,7 @@ type FriendRequest interface {
 	// Get list of friend requests sent by fromUserID
 	FindFromUserID(ctx context.Context, fromUserID string, pagination pagination.Pagination) (total int64, friendRequests []*model.FriendRequest, err error)
 	FindBothFriendRequests(ctx context.Context, fromUserID, toUserID string) (friends []*model.FriendRequest, err error)
+
+	FriendRequestIncrVersion(ctx context.Context, ownerUserID string, UserIDs []string, state int32) error
+	FindFriendRequestIncrVersion(ctx context.Context, ownerUserID string, version uint, limit int) (*model.VersionLog, error)
 }

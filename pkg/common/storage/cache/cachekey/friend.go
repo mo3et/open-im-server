@@ -21,6 +21,8 @@ const (
 	IsFriendKey         = "IS_FRIEND:" // local cache key
 	//FriendSyncSortUserIDsKey = "FRIEND_SYNC_SORT_USER_IDS:"
 	FriendMaxVersionKey = "FRIEND_MAX_VERSION:"
+
+	FriendRequestMaxVersionKey = "FRIEND_REQUEST_MAX_VERSION:"
 )
 
 func GetFriendIDsKey(ownerUserID string) string {
@@ -46,3 +48,7 @@ func GetIsFriendKey(possibleFriendUserID, userID string) string {
 //func GetFriendSyncSortUserIDsKey(ownerUserID string, count int) string {
 //	return FriendSyncSortUserIDsKey + strconv.Itoa(count) + ":" + ownerUserID
 //}
+
+func GetFriendRequestMaxVersionKey(userID string) string {
+	return FriendRequestMaxVersionKey + userID
+}

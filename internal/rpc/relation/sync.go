@@ -102,3 +102,63 @@ func (s *friendServer) GetIncrementalFriends(ctx context.Context, req *relation.
 	}
 	return opt.Build()
 }
+
+
+// func (s *friendServer) GetFullFriendsRequest(ctx context.Context, req *relation.GetFullFriendsRequestReq) (*relation.GetFullFriendsRequestResp, error) {
+// 	vl, err := s.db.FindMaxFriendRequestVersionCache(ctx, req.UserID)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	friendRequests, err := s.getFriendRequest(ctx, req.UserID, nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &relation.GetFullFriendsRequestResp{
+// 		Version:   vl.ID.Hex(),
+// 		VersionID: vl.ID.Hex(),
+// 		FriendRequests: friendRequests,
+// 	}, nil
+// }
+
+func (s *friendServer) GetIncrementalFriendsRequest(ctx context.Context, req *relation.GetIncrementalFriendsRequestReq) (*relation.GetIncrementalFriendsRequestResp, error) {
+	if err := authverify.CheckAccessV3(ctx, req.UserID, s.config.Share.IMAdminUserID); err != nil {
+		return nil, err
+	}
+	var sortVersion uint64
+	opt := incrversion.Option[*sdkws.FriendRequest, relation.GetIncrementalFriendsRequestResp]{
+		Ctx:           ctx,
+		VersionKey:    req.UserID,
+		VersionID:     req.VersionID,
+		VersionNumber: req.Version,
+		Version: func(ctx context.Context, ownerUserID string, version uint, limit int) (*model.VersionLog, error) {
+			vl, err := s.db.FindFriendRequestIncrVersion(ctx, ownerUserID, version, limit)
+			if err != nil {
+				return nil, err
+			}
+			vl.Logs = slices.DeleteFunc(vl.Logs, func(elem model.VersionLogElem) bool {
+				if elem.EID == model.VersionSortChangeID {
+					vl.LogLen--
+					sortVersion = uint64(elem.Version)
+					return true
+				}
+				return false
+			})
+			return vl, nil
+		},
+		CacheMaxVersion: s.db.FindMaxFriendRequestVersionCache,
+		Find: func(ctx context.Context, ids []string) ([]*sdkws.FriendRequest, error) {
+			return s.getFriendRequest(ctx, req.UserID, ids)
+		},
+		Resp: func(version *model.VersionLog, insertList, updateList []*sdkws.FriendRequest, full bool) *relation.GetIncrementalFriendsRequestResp {
+			return &relation.GetIncrementalFriendsRequestResp{
+				VersionID:   version.ID.Hex(),
+				Version:     uint64(version.Version),
+				Full:        full,
+				Insert:      insertList,
+				Update:      updateList,
+				SortVersion: sortVersion,
+			}
+		},
+	}
+	return opt.Build()
+}

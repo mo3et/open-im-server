@@ -36,32 +36,35 @@ const (
 // FriendCacheRedis is an implementation of the FriendCache interface using Redis.
 type FriendCacheRedis struct {
 	cache.BatchDeleter
-	friendDB   database.Friend
-	expireTime time.Duration
-	rcClient   *rockscache.Client
-	syncCount  int
+	friendDB        database.Friend
+	friendRequestDB database.FriendRequest
+	expireTime      time.Duration
+	rcClient        *rockscache.Client
+	syncCount       int
 }
 
 // NewFriendCacheRedis creates a new instance of FriendCacheRedis.
-func NewFriendCacheRedis(rdb redis.UniversalClient, localCache *config.LocalCache, friendDB database.Friend,
+func NewFriendCacheRedis(rdb redis.UniversalClient, localCache *config.LocalCache, friendDB database.Friend, friendRequestDB database.FriendRequest,
 	options *rockscache.Options) cache.FriendCache {
 	batchHandler := NewBatchDeleterRedis(rdb, options, []string{localCache.Friend.Topic})
 	f := localCache.Friend
 	log.ZDebug(context.Background(), "friend local cache init", "Topic", f.Topic, "SlotNum", f.SlotNum, "SlotSize", f.SlotSize, "enable", f.Enable())
 	return &FriendCacheRedis{
-		BatchDeleter: batchHandler,
-		friendDB:     friendDB,
-		expireTime:   friendExpireTime,
-		rcClient:     rockscache.NewClient(rdb, *options),
+		BatchDeleter:    batchHandler,
+		friendDB:        friendDB,
+		friendRequestDB: friendRequestDB,
+		expireTime:      friendExpireTime,
+		rcClient:        rockscache.NewClient(rdb, *options),
 	}
 }
 
 func (f *FriendCacheRedis) CloneFriendCache() cache.FriendCache {
 	return &FriendCacheRedis{
-		BatchDeleter: f.BatchDeleter.Clone(),
-		friendDB:     f.friendDB,
-		expireTime:   f.expireTime,
-		rcClient:     f.rcClient,
+		BatchDeleter:    f.BatchDeleter.Clone(),
+		friendDB:        f.friendDB,
+		friendRequestDB: f.friendRequestDB,
+		expireTime:      f.expireTime,
+		rcClient:        f.rcClient,
 	}
 }
 
@@ -82,6 +85,10 @@ func (f *FriendCacheRedis) getTwoWayFriendsIDsKey(ownerUserID string) string {
 // getFriendKey returns the key for storing friend info in the cache.
 func (f *FriendCacheRedis) getFriendKey(ownerUserID, friendUserID string) string {
 	return cachekey.GetFriendKey(ownerUserID, friendUserID)
+}
+
+func (f *FriendCacheRedis) getFriendRequestMaxVersionIDKey(userID string) string {
+	return cachekey.GetFriendRequestMaxVersionKey(userID)
 }
 
 // GetFriendIDs retrieves friend IDs from the cache or the database if not found.
@@ -182,5 +189,23 @@ func (f *FriendCacheRedis) DelMaxFriendVersion(ownerUserIDs ...string) cache.Fri
 func (f *FriendCacheRedis) FindMaxFriendVersion(ctx context.Context, ownerUserID string) (*model.VersionLog, error) {
 	return getCache(ctx, f.rcClient, f.getFriendMaxVersionKey(ownerUserID), f.expireTime, func(ctx context.Context) (*model.VersionLog, error) {
 		return f.friendDB.FindIncrVersion(ctx, ownerUserID, 0, 0)
+	})
+}
+
+func (f *FriendCacheRedis) DelMaxFriendRequestVersion(ownerUserIDs ...string) cache.FriendCache {
+	newFriendCache := f.CloneFriendCache()
+
+	keys := make([]string, 0, len(ownerUserIDs))
+	for _, ownerUserID := range ownerUserIDs {
+		keys = append(keys, f.getFriendRequestMaxVersionIDKey(ownerUserID))
+	}
+
+	newFriendCache.AddKeys(keys...)
+	return newFriendCache
+}
+
+func (f *FriendCacheRedis) FindMaxFriendRequestVersion(ctx context.Context, userID string) (*model.VersionLog, error) {
+	return getCache(ctx, f.rcClient, f.getFriendRequestMaxVersionIDKey(userID), f.expireTime, func(ctx context.Context) (*model.VersionLog, error) {
+		return f.friendRequestDB.FindFriendRequestIncrVersion(ctx, userID, 0, 0)
 	})
 }

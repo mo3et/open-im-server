@@ -16,7 +16,8 @@ package cache
 
 import (
 	"context"
-	relationtb "github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
+
+	"github.com/openimsdk/open-im-server/v3/pkg/common/storage/model"
 )
 
 // FriendCache is an interface for caching friend-related data.
@@ -27,7 +28,7 @@ type FriendCache interface {
 	// Called when friendID list changed
 	DelFriendIDs(ownerUserID ...string) FriendCache
 	// Get single friendInfo from the cache
-	GetFriend(ctx context.Context, ownerUserID, friendUserID string) (friend *relationtb.Friend, err error)
+	GetFriend(ctx context.Context, ownerUserID, friendUserID string) (friend *model.Friend, err error)
 	// Delete friend when friend info changed
 	DelFriend(ownerUserID, friendUserID string) FriendCache
 	// Delete friends when friends' info changed
@@ -43,5 +44,9 @@ type FriendCache interface {
 
 	//FindFriendIncrVersion(ctx context.Context, ownerUserID string, version uint, limit int) (*relationtb.VersionLog, error)
 
-	FindMaxFriendVersion(ctx context.Context, ownerUserID string) (*relationtb.VersionLog, error)
+	FindMaxFriendVersion(ctx context.Context, ownerUserID string) (*model.VersionLog, error)
+
+	DelMaxFriendRequestVersion(ownerUserIDs ...string) FriendCache
+
+	FindMaxFriendRequestVersion(ctx context.Context, userID string) (*model.VersionLog, error)
 }
