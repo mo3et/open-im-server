@@ -326,7 +326,7 @@ func (s *seqConversationCacheRedis) wait(ctx context.Context) error {
 }
 
 func (s *seqConversationCacheRedis) setSeqRetry(ctx context.Context, key string, owner int64, currSeq int64, lastSeq int64, mill int64) {
-	for i := 0; i < 10; i++ {
+	for i := range 3 {
 		state, err := s.setSeq(ctx, key, owner, currSeq, lastSeq, mill)
 		if err != nil {
 			log.ZError(ctx, "set seq cache failed", err, "key", key, "owner", owner, "currSeq", currSeq, "lastSeq", lastSeq, "count", i+1)
@@ -373,7 +373,7 @@ func (s *seqConversationCacheRedis) mallocTime(ctx context.Context, conversation
 		return 0, 0, errs.New("size must be greater than 0")
 	}
 	key := s.getSeqMallocKey(conversationID)
-	for i := 0; i < 10; i++ {
+	for range 3 {
 		states, err := s.malloc(ctx, key, size)
 		if err != nil {
 			return 0, 0, err
